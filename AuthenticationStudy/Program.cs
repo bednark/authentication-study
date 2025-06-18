@@ -1,6 +1,8 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.FileProviders;
 
+using AuthenticationStudy.Middlewares;
+
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddControllers();
@@ -14,6 +16,8 @@ using (var scope = app.Services.CreateScope()) {
   var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
   db.Database.Migrate();
 }
+
+app.UseMiddleware<AuthMiddleware>();
 
 var frontendPath = Path.Combine(Directory.GetCurrentDirectory(), "frontend", "dist");
 
