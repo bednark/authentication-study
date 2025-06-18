@@ -17,13 +17,30 @@ public class AuthMiddleware {
 
   public async Task InvokeAsync(HttpContext context) {
     var pathExcluded = new List<string> {
-      "/api/auth",
-      "/login"
+      "/api/auth/login",
+      "/api/auth/register",
+      "/api/auth/logout"
     };
 
     var requestedPath = context.Request.Path.Value ?? string.Empty;
 
-    if (pathExcluded.Contains(requestedPath) || _authMethod == "None") {
+    var isStaticFile = requestedPath.EndsWith(".js") ||
+                   requestedPath.EndsWith(".css") ||
+                   requestedPath.EndsWith(".ico") ||
+                   requestedPath.EndsWith(".png") ||
+                   requestedPath.EndsWith(".jpg") ||
+                   requestedPath.EndsWith(".jpeg") ||
+                   requestedPath.EndsWith(".svg") ||
+                   requestedPath.EndsWith(".woff") ||
+                   requestedPath.EndsWith(".woff2") ||
+                   requestedPath.StartsWith("/assets/");
+
+    if (requestedPath.Equals("/login")) {
+      context.Response.Redirect("/");
+      return;
+    }
+
+    if (isStaticFile || pathExcluded.Contains(requestedPath) || _authMethod == "None") {
       await _next(context);
       return;
     }
@@ -32,9 +49,12 @@ public class AuthMiddleware {
       case "JWT":
         var isAuthorized = await JwtAuthHandler.TryAuthenticate(context, _secretJWT, _next);
         if (!isAuthorized) {
-          if (context.Request.Headers["Accept"].Any(h => h.Contains("text/html"))) {
+          var acceptHeaders = context.Request.Headers["Accept"].ToString() ?? string.Empty;
+
+          if (acceptHeaders.Contains("text/html")) {
             context.Response.Redirect("/login");
-          } else {
+          }
+          else {
             context.Response.StatusCode = StatusCodes.Status401Unauthorized;
             await context.Response.WriteAsync("Unauthorized");
           }

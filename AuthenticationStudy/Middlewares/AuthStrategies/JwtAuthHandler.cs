@@ -9,7 +9,7 @@ namespace AuthenticationStudy.AuthStrategies;
 public static class JwtAuthHandler {
   public static async Task<bool> TryAuthenticate(HttpContext context, string jwtSecret, RequestDelegate next) {
     try {
-      var token = context.Request.Headers["Authorization"].FirstOrDefault()?.Split(" ").Last();
+      var token = context.Request.Cookies["Authorization"].ToString() ?? string.Empty;
 
       if (string.IsNullOrEmpty(token)) {
         throw new SecurityTokenException("Missing token");

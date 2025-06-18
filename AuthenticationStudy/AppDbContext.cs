@@ -5,6 +5,7 @@ public class AppDbContext : DbContext {
   public AppDbContext(DbContextOptions<AppDbContext> options) : base(options) {}
 
   public DbSet<Clients> Clients { get; set; }
+  public DbSet<Users> Users { get; set; }
 
   protected override void OnModelCreating(ModelBuilder modelBuilder) {
     modelBuilder.HasDefaultSchema("auth");
@@ -28,5 +29,24 @@ public class AppDbContext : DbContext {
       entity.Property(c => c.Country).HasColumnName("country")
         .IsRequired().HasMaxLength(50);
     });
+
+    modelBuilder.Entity<Users>(entity => {
+      entity.ToTable("users");
+
+      entity.Property(u => u.Id).HasColumnName("id");
+      entity.Property(u => u.Username).HasColumnName("username")
+        .IsRequired().HasMaxLength(50);
+      entity.Property(u => u.FirstName).HasColumnName("first_name")
+        .IsRequired().HasMaxLength(50);
+      entity.Property(u => u.LastName).HasColumnName("last_name")
+        .IsRequired().HasMaxLength(50);
+      entity.Property(u => u.PasswordHash).HasColumnName("password_hash")
+        .IsRequired();
+      entity.Property(u => u.PasswordSalt).HasColumnName("password_salt")
+        .IsRequired();
+    });
+    modelBuilder.Entity<Users>()
+      .HasIndex(u => u.Username)
+      .IsUnique();
   }
 }
