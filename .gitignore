@@ -1,7 +1,6 @@
 # .NET
 bin/
 obj/
-Migrations/
 appsettings.json
 
 # Logs
