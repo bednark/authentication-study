@@ -3,11 +3,11 @@ using AuthenticationStudy.Models;
 
 namespace AuthenticationStudy.Services;
 
-public class AuthService {
+public class JwtAuthService {
   private readonly AppDbContext _context;
   private readonly string _jwtKey;
 
-  public AuthService(AppDbContext context, IConfiguration config) {
+  public JwtAuthService(AppDbContext context, IConfiguration config) {
     _context = context;
     _jwtKey = config["Auth:JWT:Key"]!;
   }

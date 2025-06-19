@@ -7,7 +7,7 @@ using AuthenticationStudy.Middlewares;
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddControllers();
-builder.Services.AddScoped<AuthService>();
+builder.Services.AddScoped<JwtAuthService>();
 
 builder.Services.AddDbContext<AppDbContext>(options =>
   options.UseNpgsql(builder.Configuration.GetConnectionString("Default")));

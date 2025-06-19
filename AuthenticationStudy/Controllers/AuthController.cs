@@ -7,9 +7,9 @@ namespace AuthenticationStudy.Controllers;
 [ApiController]
 [Route("api/[controller]")]
 public class AuthController : ControllerBase {
-  private readonly AuthService _authService;
+  private readonly JwtAuthService _authService;
 
-  public AuthController(AuthService authService) {
+  public AuthController(JwtAuthService authService) {
     _authService = authService;
   }
 
