@@ -7,13 +7,10 @@ using Microsoft.IdentityModel.Tokens;
 namespace AuthenticationStudy.AuthStrategies;
 
 public static class JwtAuthHandler {
-  public static async Task<bool> TryAuthenticate(HttpContext context, string jwtSecret, RequestDelegate next) {
+  public static Task<bool> TryAuthenticate(HttpContext context, string jwtSecret) {
     try {
-      var token = context.Request.Cookies["Authorization"].ToString() ?? string.Empty;
-
-      if (string.IsNullOrEmpty(token)) {
-        throw new SecurityTokenException("Missing token");
-      }
+      var token = context.Request.Cookies["Authorization"];
+      if (string.IsNullOrEmpty(token)) return Task.FromResult(false);
 
       var tokenHandler = new JwtSecurityTokenHandler();
       var key = Encoding.UTF8.GetBytes(jwtSecret);
@@ -29,16 +26,20 @@ public static class JwtAuthHandler {
       var principal = tokenHandler.ValidateToken(token, validationParameters, out SecurityToken validatedToken);
 
       if (validatedToken is not JwtSecurityToken jwtToken ||
-          !jwtToken.Header.Alg.Equals(SecurityAlgorithms.HmacSha256, StringComparison.InvariantCultureIgnoreCase)) {
-        throw new SecurityTokenException("Invalid algorithm");
-      }
+          !jwtToken.Header.Alg.Equals(SecurityAlgorithms.HmacSha256, StringComparison.InvariantCultureIgnoreCase))
+        return Task.FromResult(false);
 
       context.User = principal;
-      await next(context);
-      return true;
+      return Task.FromResult(true);
+    } catch {
+      return Task.FromResult(false);
     }
-    catch {
-      return false;
-    }
+  }
+
+  public static async Task<bool> TryAuthenticate(HttpContext context, string jwtSecret, RequestDelegate next) {
+    if (!await TryAuthenticate(context, jwtSecret)) return false;
+
+    await next(context);
+    return true;
   }
 }

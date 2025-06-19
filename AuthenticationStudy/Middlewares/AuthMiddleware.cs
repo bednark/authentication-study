@@ -19,25 +19,29 @@ public class AuthMiddleware {
     var pathExcluded = new List<string> {
       "/api/auth/login",
       "/api/auth/register",
-      "/api/auth/logout"
+      "/api/auth/logout",
+      "/login"
     };
 
     var requestedPath = context.Request.Path.Value ?? string.Empty;
 
     var isStaticFile = requestedPath.EndsWith(".js") ||
-                   requestedPath.EndsWith(".css") ||
-                   requestedPath.EndsWith(".ico") ||
-                   requestedPath.EndsWith(".png") ||
-                   requestedPath.EndsWith(".jpg") ||
-                   requestedPath.EndsWith(".jpeg") ||
-                   requestedPath.EndsWith(".svg") ||
-                   requestedPath.EndsWith(".woff") ||
-                   requestedPath.EndsWith(".woff2") ||
-                   requestedPath.StartsWith("/assets/");
+      requestedPath.EndsWith(".css") ||
+      requestedPath.EndsWith(".ico") ||
+      requestedPath.EndsWith(".png") ||
+      requestedPath.EndsWith(".jpg") ||
+      requestedPath.EndsWith(".jpeg") ||
+      requestedPath.EndsWith(".svg") ||
+      requestedPath.EndsWith(".woff") ||
+      requestedPath.EndsWith(".woff2") ||
+      requestedPath.StartsWith("/assets/");
 
-    if (requestedPath.Equals("/login")) {
-      context.Response.Redirect("/");
-      return;
+    if ((requestedPath.Equals("/login") || requestedPath.Equals("/")) && _authMethod == "JWT") {
+      var isAuthorized = await JwtAuthHandler.TryAuthenticate(context, _secretJWT);
+      if (isAuthorized) {
+        context.Response.Redirect("/klienci");
+        return;
+      }
     }
 
     if (isStaticFile || pathExcluded.Contains(requestedPath) || _authMethod == "None") {
@@ -47,14 +51,12 @@ public class AuthMiddleware {
 
     switch (_authMethod) {
       case "JWT":
-        var isAuthorized = await JwtAuthHandler.TryAuthenticate(context, _secretJWT, _next);
-        if (!isAuthorized) {
+        var isAuthenticated = await JwtAuthHandler.TryAuthenticate(context, _secretJWT, _next);
+        if (!isAuthenticated) {
           var acceptHeaders = context.Request.Headers["Accept"].ToString() ?? string.Empty;
-
           if (acceptHeaders.Contains("text/html")) {
             context.Response.Redirect("/login");
-          }
-          else {
+          } else {
             context.Response.StatusCode = StatusCodes.Status401Unauthorized;
             await context.Response.WriteAsync("Unauthorized");
           }
@@ -63,12 +65,10 @@ public class AuthMiddleware {
         break;
 
       case "OAuth2":
-        // TODO: handle OAuth2 authentication
         await _next(context);
         break;
 
       case "mTLS":
-        // TODO: handle mutual TLS authentication
         await _next(context);
         break;
 
