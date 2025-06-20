@@ -1,70 +1,139 @@
-using System.Text;
-using AuthenticationStudy.AuthStrategies;
-using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Authentication;
+
+using AuthenticationStudy.Middlewares.AuthStrategies;
 
 namespace AuthenticationStudy.Middlewares;
 
-public class AuthMiddleware {
-  private readonly RequestDelegate _next;
-  private readonly string _authMethod;
-  private readonly string _secretJWT;
+public class AuthMiddleware(RequestDelegate next, IConfiguration config)
+{
+  private readonly RequestDelegate _next = next;
+  private readonly string _authMethod = config["Auth:Method"] ?? "None";
+  private readonly string _secretJWT = config["Auth:JWT:Key"] ?? string.Empty;
 
-  public AuthMiddleware(RequestDelegate next, IConfiguration config) {
-    _next = next;
-    _authMethod = config["Auth:Method"] ?? "None";
-    _secretJWT = config["Auth:JWT:Key"] ?? string.Empty;
+  // Method is resposible for checking if the requested path is a static file.
+  private static bool IsStaticFile(string path)
+  {
+    return path.EndsWith(".js") ||
+           path.EndsWith(".css") ||
+           path.EndsWith(".ico") ||
+           path.EndsWith(".png") ||
+           path.EndsWith(".jpg") ||
+           path.EndsWith(".jpeg") ||
+           path.EndsWith(".svg") ||
+           path.EndsWith(".woff") ||
+           path.EndsWith(".woff2") ||
+           path.StartsWith("/assets/");
   }
 
-  public async Task InvokeAsync(HttpContext context) {
-    var pathExcluded = new List<string> {
-      "/api/auth/login",
-      "/api/auth/register",
-      "/api/auth/logout",
-      "/login"
-    };
-
-    var requestedPath = context.Request.Path.Value ?? string.Empty;
-
-    var isStaticFile = requestedPath.EndsWith(".js") ||
-      requestedPath.EndsWith(".css") ||
-      requestedPath.EndsWith(".ico") ||
-      requestedPath.EndsWith(".png") ||
-      requestedPath.EndsWith(".jpg") ||
-      requestedPath.EndsWith(".jpeg") ||
-      requestedPath.EndsWith(".svg") ||
-      requestedPath.EndsWith(".woff") ||
-      requestedPath.EndsWith(".woff2") ||
-      requestedPath.StartsWith("/assets/");
-
-    if ((requestedPath.Equals("/login") || requestedPath.Equals("/")) && _authMethod == "JWT") {
-      var isAuthorized = await JwtAuthHandler.TryAuthenticate(context, _secretJWT);
-      if (isAuthorized) {
-        context.Response.Redirect("/klienci");
-        return;
-      }
+  public async Task InvokeAsync(HttpContext context)
+  {
+    // If the authentication method is OAuth2 or mTLS and the request path is "/login",
+    // redirect to "/klienci" to prevent access to the login page directly.
+    if ((_authMethod is "OAuth2" or "mTLS" or "None") && context.Request.Path == "/login")
+    {
+      context.Response.Redirect("/klienci");
+      return;
     }
 
-    if (isStaticFile || pathExcluded.Contains(requestedPath) || _authMethod == "None") {
+    // If the authentication method is "None", skip authentication and proceed to the next middleware.
+    if (_authMethod.Equals("None"))
+    {
       await _next(context);
       return;
     }
 
-    switch (_authMethod) {
+    // Define a set of API paths that should not require JWT authentication.
+    var jwtApiPaths = new HashSet<string>
+    {
+      "/api/auth/login",
+      "/api/auth/register",
+      "/api/auth/logout"
+    };
+
+    // Get the requested path from the context.
+    var requestedPath = context.Request.Path.Value ?? string.Empty;
+
+    // If the requested path is in the set of JWT API paths and the authentication method is not JWT,
+    // return a 404 Not Found response.
+    if (jwtApiPaths.Contains(requestedPath) && _authMethod is "mTLS" or "OAuth2" or "None")
+    {
+      context.Response.StatusCode = StatusCodes.Status404NotFound;
+      return;
+    }
+
+    // Check if the request's Accept header indicates HTML.
+    var acceptHeaders = context.Request.Headers.Accept.ToString() ?? string.Empty;
+    var isHtmlRequest = acceptHeaders.Contains("text/html");
+
+    // If the requested path is a static file skip authentication.
+    if (IsStaticFile(requestedPath))
+    {
+      await _next(context);
+      return;
+    }
+
+    switch (_authMethod)
+    {
       case "JWT":
-        var isAuthenticated = await JwtAuthHandler.TryAuthenticate(context, _secretJWT, _next);
-        if (!isAuthenticated) {
-          var acceptHeaders = context.Request.Headers["Accept"].ToString() ?? string.Empty;
-          if (acceptHeaders.Contains("text/html")) {
+        // If the requested path is in the set of JWT API paths, skip authentication.
+        if (jwtApiPaths.Contains(requestedPath))
+        {
+          await _next(context);
+          return;
+        }
+
+        // Execute JWT authentication.
+        var isAuthenticatedJwt = await JwtAuthenticator.TryAuthenticate(context, _secretJWT);
+
+        if (!isAuthenticatedJwt)
+        {
+          // If the request is not authenticated and the requested path is "/login",
+          // allow the request to proceed to the next middleware.
+          if (requestedPath.Equals("/login"))
+          {
+            await _next(context);
+            return;
+          }
+
+          // If the request is not authenticated and the Accept header indicates HTML,
+          // redirect to the login page else return 401 Unauthorized.
+          if (isHtmlRequest)
+          {
             context.Response.Redirect("/login");
-          } else {
+            return;
+          }
+          else
+          {
             context.Response.StatusCode = StatusCodes.Status401Unauthorized;
             await context.Response.WriteAsync("Unauthorized");
           }
           return;
         }
+        else
+        {
+          // If the request is authenticated and the requested path is "/login" or "/",
+          // redirect to "/klienci" to prevent access to the login page directly.
+          if (requestedPath.Equals("/login") || requestedPath.Equals("/"))
+          {
+            context.Response.Redirect("/klienci");
+            return;
+          }
+        }
+
+        await _next(context);
         break;
 
       case "OAuth2":
+        // If the request is not authenticated execute OpenID Connect challenge.
+        if (!context.User.Identity?.IsAuthenticated ?? true)
+        {
+          await context.ChallengeAsync("oidc", new AuthenticationProperties
+          {
+            RedirectUri = "/klienci"
+          });
+          return;
+        }
+
         await _next(context);
         break;
 

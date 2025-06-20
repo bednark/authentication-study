@@ -1,4 +1,4 @@
-import { Routes, Route, Navigate } from "react-router-dom"
+import { Routes, Route } from "react-router-dom"
 
 import Clients from "./views/Clients";
 import Login from "./views/Login";
@@ -20,7 +20,6 @@ const App = () => {
       <Route path="/login" element={
       <Login onLogin={handleLogin} />
       } />
-      <Route path="*" element={<Navigate to="/" />} />
     </Routes>
   );
 }

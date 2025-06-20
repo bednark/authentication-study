@@ -1,0 +1,43 @@
+services:
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.2
+    command:
+      - start
+    env_file: .env.kc
+    restart: unless-stopped
+    depends_on:
+      - postgres_keycloak
+    ports:
+      - "8080:8080"
+    networks:
+      - keycloak_net
+    security_opt:
+      - no-new-privileges:true
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "5"
+
+  postgres_keycloak:
+    image: postgres:17.5
+    restart: unless-stopped
+    env_file: .env.postgres
+    volumes:
+      - postgres_keycloak:/var/lib/postgresql/data
+    user: "999:999"
+    networks:
+      - keycloak_net
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "5"
+
+networks:
+  keycloak_net:
+    name: keycloak_net
+
+volumes:
+  postgres_keycloak:
+  keycloak_data:
