@@ -23,9 +23,13 @@ if (isHttps)
     {
       listenOptions.UseHttps(certPath!, certPassword!, httpsOptions =>
       {
-        httpsOptions.ClientCertificateMode = ClientCertificateMode.RequireCertificate;
-        httpsOptions.ClientCertificateValidation = (cert, chain, errors) => true;
-        httpsOptions.CheckCertificateRevocation = false;
+        var authMethod = config["Auth:Method"] ?? "None";
+        if (authMethod.Equals("mTLS"))
+        {
+          httpsOptions.ClientCertificateMode = ClientCertificateMode.RequireCertificate;
+          httpsOptions.ClientCertificateValidation = (cert, chain, errors) => true;
+          httpsOptions.CheckCertificateRevocation = false;
+        }
       });
     });
   });

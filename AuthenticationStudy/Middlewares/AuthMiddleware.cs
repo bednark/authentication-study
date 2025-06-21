@@ -177,7 +177,6 @@ public class AuthMiddleware(RequestDelegate next, IConfiguration config)
           if (!isValid)
           {
             context.Response.StatusCode = StatusCodes.Status401Unauthorized;
-            await context.Response.WriteAsync("Certyfikat klienta nie jest zaufany.");
             return;
           }
         }
@@ -187,7 +186,6 @@ public class AuthMiddleware(RequestDelegate next, IConfiguration config)
 
       default:
         context.Response.StatusCode = StatusCodes.Status401Unauthorized;
-        await context.Response.WriteAsync("Authentication method not supported.");
         return;
     }
   }
