@@ -1,8 +1,6 @@
-import axios from "axios";
-
 const LogoutBtn = () => {
   const handleLogout = async () => {
-    await axios.post("/api/auth/logout");
+    window.location.href = "/api/auth/logout";
   };
 
   return (
