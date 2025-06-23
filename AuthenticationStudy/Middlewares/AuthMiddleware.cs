@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Authentication;
+using System.Security.Cryptography.X509Certificates;
 
 using AuthenticationStudy.Middlewares.AuthStrategies;
 
@@ -9,6 +10,8 @@ public class AuthMiddleware(RequestDelegate next, IConfiguration config)
   private readonly RequestDelegate _next = next;
   private readonly string _authMethod = config["Auth:Method"] ?? "None";
   private readonly string _secretJWT = config["Auth:JWT:Key"] ?? string.Empty;
+  private readonly string _caPath = config["Auth:mTLS:CaPath"] ?? string.Empty;
+  private readonly string _caKeyPath = config["Auth:mTLS:CaKeyPath"] ?? string.Empty;
 
   // Method is resposible for checking if the requested path is a static file.
   private static bool IsStaticFile(string path)
@@ -138,12 +141,51 @@ public class AuthMiddleware(RequestDelegate next, IConfiguration config)
         break;
 
       case "mTLS":
+        // Get the client certificate from the connection.
+        var clientCert = context.Connection.ClientCertificate;
+
+        // If the client certificate is null, return 401 Unauthorized.
+        if (clientCert == null)
+        {
+          context.Response.StatusCode = StatusCodes.Status401Unauthorized;
+          return;
+        }
+
+        // Get the current time in the Poland time zone.
+        var polandZone = TimeZoneInfo.FindSystemTimeZoneById("Central European Standard Time");
+        var localTime = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, polandZone);
+
+        // Check if the client certificate is valid for the current time.
+        if (localTime < clientCert.NotBefore || localTime > clientCert.NotAfter)
+        {
+          context.Response.StatusCode = StatusCodes.Status401Unauthorized;
+          return;
+        }
+
+        using (var chain = new X509Chain())
+        {
+          chain.ChainPolicy.RevocationMode = X509RevocationMode.NoCheck;
+          chain.ChainPolicy.RevocationFlag = X509RevocationFlag.ExcludeRoot;
+          chain.ChainPolicy.VerificationFlags = X509VerificationFlags.NoFlag;
+          chain.ChainPolicy.VerificationFlags = X509VerificationFlags.AllowUnknownCertificateAuthority;
+
+          var caCert = X509Certificate2.CreateFromPemFile(_caPath, _caKeyPath);
+          chain.ChainPolicy.ExtraStore.Add(caCert);
+
+          bool isValid = chain.Build(clientCert);
+
+          if (!isValid)
+          {
+            context.Response.StatusCode = StatusCodes.Status401Unauthorized;
+            return;
+          }
+        }
+
         await _next(context);
         break;
 
       default:
         context.Response.StatusCode = StatusCodes.Status401Unauthorized;
-        await context.Response.WriteAsync("Authentication method not supported.");
         return;
     }
   }

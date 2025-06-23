@@ -3,12 +3,37 @@ using Microsoft.Extensions.FileProviders;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authentication.OpenIdConnect;
 using Microsoft.IdentityModel.Protocols.OpenIdConnect;
+using System.Net;
+using Microsoft.AspNetCore.Server.Kestrel.Https;
 
 using AuthenticationStudy.Services;
 using AuthenticationStudy.Middlewares;
 
 var builder = WebApplication.CreateBuilder(args);
 var config = builder.Configuration;
+var certPath = config["Certificate:Path"];
+var certPassword = config["Certificate:Password"];
+var isHttps = !string.IsNullOrEmpty(certPath) && !string.IsNullOrEmpty(certPassword);
+
+if (isHttps)
+{
+  builder.WebHost.ConfigureKestrel(options =>
+  {
+    options.Listen(IPAddress.Any, 5202, listenOptions =>
+    {
+      listenOptions.UseHttps(certPath!, certPassword!, httpsOptions =>
+      {
+        var authMethod = config["Auth:Method"] ?? "None";
+        if (authMethod.Equals("mTLS"))
+        {
+          httpsOptions.ClientCertificateMode = ClientCertificateMode.RequireCertificate;
+          httpsOptions.ClientCertificateValidation = (cert, chain, errors) => true;
+          httpsOptions.CheckCertificateRevocation = false;
+        }
+      });
+    });
+  });
+}
 
 builder.Services.AddControllers();
 builder.Services.AddScoped<JwtAuthService>();
@@ -67,8 +92,14 @@ app.UseStaticFiles(new StaticFileOptions {
 });
 
 app.MapControllers();
-app.MapFallbackToFile("index.html", new StaticFileOptions {
+app.MapFallbackToFile("index.html", new StaticFileOptions
+{
   FileProvider = new PhysicalFileProvider(frontendPath)
 });
+
+if (isHttps)
+{
+  app.UseHttpsRedirection();
+}
 
 app.Run();
