@@ -1,6 +1,6 @@
 const Header = () => {
   return (
-    <header className="flex flex-col items-center justify-center text-center text-white pt-24">
+    <header className="flex flex-col items-center justify-center text-center text-white pt-24 w-full">
       <h1 className="mb-4 leading-none tracking-tight
       text-gray-900 text-xl lg:text-2xl dark:text-white">
         Porównanie wybranych metod autoryzacji API: JWT, OAuth2 i mTLS w kontekście bezpieczeństwa, logowania i reakcji na zagrożenia.  

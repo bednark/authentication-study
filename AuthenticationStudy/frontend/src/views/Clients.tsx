@@ -9,6 +9,7 @@ import Header from "../components/Header";
 import Footer from "../components/Footer";
 import ConfirmDeleteModal from "../components/ConfirmDeleteModal";
 import ClientsForm from "../components/ClientsForm";
+import LogoutBtn from "../components/LogoutBtn";
 
 const Clients = () => {
   const [clients, setClients] = useState<IClient[]>([]);
@@ -76,7 +77,10 @@ const Clients = () => {
     <>
       <div className="container mx-auto p-4 bg-gray-900 min-w-screen h-screen
       flex flex-col justify-between">
-        <Header />
+        <div className="flex relative">
+          <Header />
+          <LogoutBtn />
+        </div>
         <main>
           <ClientsTable clients={clients} handleOpenModal={handleOpenModal}
           handleOpenDeleteModal={handleOpenDeleteModal} />
