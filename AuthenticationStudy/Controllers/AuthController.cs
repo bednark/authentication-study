@@ -41,15 +41,15 @@ public class AuthController(JwtAuthService authService, IConfiguration config) :
 
   [HttpGet("logout")]
   public IActionResult Logout() {
+    var redirectBaseUrl = $"{Request.Scheme}://{Request.Host}{Request.PathBase}/";
+
     switch (_authMethod)
     {
       case "JWT":
         Response.Cookies.Delete("Authorization");
-        return Ok("Logged out successfully.");
+        return Redirect(redirectBaseUrl);
 
       case "OAuth2":
-        var redirectBaseUrl = $"{Request.Scheme}://{Request.Host}{Request.PathBase}/";
-
         return SignOut(new AuthenticationProperties
         {
           RedirectUri = redirectBaseUrl,

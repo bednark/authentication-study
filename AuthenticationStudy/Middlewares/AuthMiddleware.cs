@@ -89,7 +89,11 @@ public class AuthMiddleware(RequestDelegate next, IConfiguration config)
     switch (_authMethod)
     {
       case "JWT":
-
+        if (jwtApiPaths.Contains(requestedPath))
+        {
+          await _next(context);
+          return;
+        }
         // Execute JWT authentication.
         var isAuthenticatedJwt = await JwtAuthenticator.TryAuthenticate(context, _secretJWT);
 
