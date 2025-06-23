@@ -1,17 +1,16 @@
 using AuthenticationStudy.Models;
 using AuthenticationStudy.Services;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.Authentication;
 
 namespace AuthenticationStudy.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
-public class AuthController : ControllerBase {
-  private readonly JwtAuthService _authService;
-
-  public AuthController(JwtAuthService authService) {
-    _authService = authService;
-  }
+public class AuthController(JwtAuthService authService, IConfiguration config) : ControllerBase {
+  private readonly JwtAuthService _authService = authService;
+  private readonly string _authMethod = config["Auth:Method"] ?? "None";
 
   [HttpPost("register")]
   public async Task<IActionResult> Register(UserForm dto) {
@@ -40,9 +39,26 @@ public class AuthController : ControllerBase {
     return Ok("Login successful.");
   }
 
-  [HttpPost("logout")]
+  [HttpGet("logout")]
   public IActionResult Logout() {
-    Response.Cookies.Delete("Authorization");
-    return Ok("Logged out.");
+    var redirectBaseUrl = $"{Request.Scheme}://{Request.Host}{Request.PathBase}/";
+
+    switch (_authMethod)
+    {
+      case "JWT":
+        Response.Cookies.Delete("Authorization");
+        return Redirect(redirectBaseUrl);
+
+      case "OAuth2":
+        return SignOut(new AuthenticationProperties
+        {
+          RedirectUri = redirectBaseUrl,
+        },
+        CookieAuthenticationDefaults.AuthenticationScheme,
+        "oidc");
+
+      default:
+        return BadRequest("Unsupported authentication method.");
+    }
   }
 }

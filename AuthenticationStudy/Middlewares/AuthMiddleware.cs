@@ -30,11 +30,20 @@ public class AuthMiddleware(RequestDelegate next, IConfiguration config)
 
   public async Task InvokeAsync(HttpContext context)
   {
+    // Get the requested path from the context.
+    var requestedPath = context.Request.Path.Value ?? string.Empty;
+
     // If the authentication method is OAuth2 or mTLS and the request path is "/login",
     // redirect to "/klienci" to prevent access to the login page directly.
-    if ((_authMethod is "OAuth2" or "mTLS" or "None") && context.Request.Path == "/login")
+    if ((_authMethod is "OAuth2" or "mTLS" or "None") && requestedPath == "/login")
     {
       context.Response.Redirect("/klienci");
+      return;
+    }
+
+    if ((_authMethod is "mTLS" or "None") && requestedPath == "/api/auth/logout")
+    {
+      context.Response.StatusCode = StatusCodes.Status404NotFound;
       return;
     }
 
@@ -49,12 +58,8 @@ public class AuthMiddleware(RequestDelegate next, IConfiguration config)
     var jwtApiPaths = new HashSet<string>
     {
       "/api/auth/login",
-      "/api/auth/register",
-      "/api/auth/logout"
+      "/api/auth/register"
     };
-
-    // Get the requested path from the context.
-    var requestedPath = context.Request.Path.Value ?? string.Empty;
 
     // If the requested path is in the set of JWT API paths and the authentication method is not JWT,
     // return a 404 Not Found response.
@@ -64,9 +69,11 @@ public class AuthMiddleware(RequestDelegate next, IConfiguration config)
       return;
     }
 
-    // Check if the request's Accept header indicates HTML.
-    var acceptHeaders = context.Request.Headers.Accept.ToString() ?? string.Empty;
-    var isHtmlRequest = acceptHeaders.Contains("text/html");
+    if ((_authMethod is "OAuth2" or "JWT") && (requestedPath is "/api/auth/logout"))
+    {
+      await _next(context);
+      return;
+    }
 
     // If the requested path is a static file skip authentication.
     if (IsStaticFile(requestedPath))
@@ -75,16 +82,18 @@ public class AuthMiddleware(RequestDelegate next, IConfiguration config)
       return;
     }
 
+    // Check if the request's Accept header indicates HTML.
+    var acceptHeaders = context.Request.Headers.Accept.ToString() ?? string.Empty;
+    var isHtmlRequest = acceptHeaders.Contains("text/html");
+
     switch (_authMethod)
     {
       case "JWT":
-        // If the requested path is in the set of JWT API paths, skip authentication.
         if (jwtApiPaths.Contains(requestedPath))
         {
           await _next(context);
           return;
         }
-
         // Execute JWT authentication.
         var isAuthenticatedJwt = await JwtAuthenticator.TryAuthenticate(context, _secretJWT);
 
