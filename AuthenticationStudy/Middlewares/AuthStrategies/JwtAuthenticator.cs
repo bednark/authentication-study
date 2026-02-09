@@ -46,6 +46,12 @@ public static class JwtAuthenticator
     }
     catch
     {
+      // If any exception occurs during validation, return false
+      // Cases possible here include:
+      // - Invalid token format
+      // - Token expired
+      // - Signature validation failed
+      // - Any other validation error
       return Task.FromResult(false);
     }
   }

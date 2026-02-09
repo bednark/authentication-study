@@ -27,7 +27,10 @@ public class AuthController(JwtAuthService authService, IConfiguration config) :
     var token = await _authService.Login(dto.Username, dto.Password);
 
     if (token is null)
+    {
+      // Log the failed login attempt
       return Unauthorized("Invalid credentials.");
+    }
 
     Response.Cookies.Append("Authorization", token, new CookieOptions {
       HttpOnly = true,

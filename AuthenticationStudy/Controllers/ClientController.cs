@@ -7,12 +7,8 @@ namespace AuthenticationStudy.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
-public class ClientController : ControllerBase {
-  private readonly AppDbContext _context;
-
-  public ClientController(AppDbContext context) {
-    _context = context;
-  }
+public class ClientController(AppDbContext context) : ControllerBase {
+  private readonly AppDbContext _context = context;
 
   [HttpGet("{id}")]
   public async Task<IActionResult> GetClient([FromRoute] int id) {

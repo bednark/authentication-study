@@ -3,14 +3,10 @@ using AuthenticationStudy.Models;
 
 namespace AuthenticationStudy.Services;
 
-public class JwtAuthService {
-  private readonly AppDbContext _context;
-  private readonly string _jwtKey;
-
-  public JwtAuthService(AppDbContext context, IConfiguration config) {
-    _context = context;
-    _jwtKey = config["Auth:JWT:Key"]!;
-  }
+public class JwtAuthService(AppDbContext context, IConfiguration config)
+{
+  private readonly AppDbContext _context = context;
+  private readonly string _jwtKey = config["Auth:JWT:Key"]!;
 
   public async Task<bool> Register(string username, string password) {
     if (await _context.Users.AnyAsync(u => u.Username == username))
@@ -32,7 +28,10 @@ public class JwtAuthService {
   public async Task<string?> Login(string username, string password) {
     var user = await _context.Users.FirstOrDefaultAsync(u => u.Username == username);
     if (user == null || !PasswordHelper.VerifyPassword(password, user.PasswordHash, user.PasswordSalt))
+    {
+      // Log if the user was not found or password verification failed
       return null;
+    }
 
     return JwtTokenGenerator.Generate(user, _jwtKey);
   }
