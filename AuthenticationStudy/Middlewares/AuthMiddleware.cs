@@ -33,9 +33,9 @@ public class AuthMiddleware(RequestDelegate next, IConfiguration config)
     // Get the requested path from the context.
     var requestedPath = context.Request.Path.Value ?? string.Empty;
 
-    // If the authentication method is OAuth2 or mTLS and the request path is "/login",
+    // If the authentication method is OIDC or mTLS and the request path is "/login",
     // redirect to "/klienci" to prevent access to the login page directly.
-    if ((_authMethod is "OAuth2" or "mTLS" or "None") && requestedPath == "/login")
+    if ((_authMethod is "OIDC" or "mTLS" or "None") && requestedPath == "/login")
     {
       context.Response.Redirect("/klienci");
       return;
@@ -63,13 +63,13 @@ public class AuthMiddleware(RequestDelegate next, IConfiguration config)
 
     // If the requested path is in the set of JWT API paths and the authentication method is not JWT,
     // return a 404 Not Found response.
-    if (jwtApiPaths.Contains(requestedPath) && _authMethod is "mTLS" or "OAuth2" or "None")
+    if (jwtApiPaths.Contains(requestedPath) && _authMethod is "mTLS" or "OIDC" or "None")
     {
       context.Response.StatusCode = StatusCodes.Status404NotFound;
       return;
     }
 
-    if ((_authMethod is "OAuth2" or "JWT") && (requestedPath is "/api/auth/logout"))
+    if ((_authMethod is "OIDC" or "JWT") && (requestedPath is "/api/auth/logout"))
     {
       await _next(context);
       return;
@@ -135,7 +135,7 @@ public class AuthMiddleware(RequestDelegate next, IConfiguration config)
         await _next(context);
         break;
 
-      case "OAuth2":
+      case "OIDC":
         // If the request is not authenticated execute OpenID Connect challenge.
         if (!context.User.Identity?.IsAuthenticated ?? true)
         {

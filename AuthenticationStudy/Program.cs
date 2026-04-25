@@ -38,7 +38,7 @@ if (isHttps)
 builder.Services.AddControllers();
 builder.Services.AddScoped<JwtAuthService>();
 
-if (config["Auth:Method"] == "OAuth2") {
+if (config["Auth:Method"] == "OIDC") {
   builder.Services.AddAuthentication(options =>
   {
     options.DefaultScheme = CookieAuthenticationDefaults.AuthenticationScheme;
@@ -47,9 +47,9 @@ if (config["Auth:Method"] == "OAuth2") {
     .AddCookie()
     .AddOpenIdConnect("oidc", options =>
     { 
-      options.Authority = $"{config["Auth:OAuth2:Keycloak:BaseUrl"]}/realms/{config["Auth:OAuth2:Keycloak:Realm"]}";
-      options.ClientId = config["Auth:OAuth2:Keycloak:ClientId"];
-      options.ClientSecret = config["Auth:OAuth2:Keycloak:ClientSecret"];
+      options.Authority = $"{config["Auth:OIDC:Keycloak:BaseUrl"]}/realms/{config["Auth:OIDC:Keycloak:Realm"]}";
+      options.ClientId = config["Auth:OIDC:Keycloak:ClientId"];
+      options.ClientSecret = config["Auth:OIDC:Keycloak:ClientSecret"];
       options.ResponseType = OpenIdConnectResponseType.Code;
       options.SaveTokens = true;
       options.GetClaimsFromUserInfoEndpoint = true;

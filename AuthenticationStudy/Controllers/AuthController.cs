@@ -49,7 +49,7 @@ public class AuthController(JwtAuthService authService, IConfiguration config) :
         Response.Cookies.Delete("Authorization");
         return Redirect(redirectBaseUrl);
 
-      case "OAuth2":
+      case "OIDC":
         return SignOut(new AuthenticationProperties
         {
           RedirectUri = redirectBaseUrl,
