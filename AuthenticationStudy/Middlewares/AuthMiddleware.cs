@@ -11,7 +11,6 @@ public class AuthMiddleware(RequestDelegate next, IConfiguration config)
   private readonly string _authMethod = config["Auth:Method"] ?? "None";
   private readonly string _secretJWT = config["Auth:JWT:Key"] ?? string.Empty;
   private readonly string _caPath = config["Auth:mTLS:CaPath"] ?? string.Empty;
-  private readonly string _caKeyPath = config["Auth:mTLS:CaKeyPath"] ?? string.Empty;
 
   // Method is resposible for checking if the requested path is a static file.
   private static bool IsStaticFile(string path)
@@ -150,6 +149,7 @@ public class AuthMiddleware(RequestDelegate next, IConfiguration config)
         break;
 
       case "mTLS":
+      {
         // Get the client certificate from the connection.
         var clientCert = context.Connection.ClientCertificate;
 
@@ -160,38 +160,42 @@ public class AuthMiddleware(RequestDelegate next, IConfiguration config)
           return;
         }
 
-        // Get the current time in the Poland time zone.
-        var polandZone = TimeZoneInfo.FindSystemTimeZoneById("Central European Standard Time");
-        var localTime = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, polandZone);
+        var now = DateTimeOffset.UtcNow;
 
         // Check if the client certificate is valid for the current time.
-        if (localTime < clientCert.NotBefore || localTime > clientCert.NotAfter)
+        if (now < clientCert.NotBefore.ToUniversalTime() ||
+        now > clientCert.NotAfter.ToUniversalTime())
         {
           context.Response.StatusCode = StatusCodes.Status401Unauthorized;
           return;
         }
 
-        using (var chain = new X509Chain())
+        using var chain = new X509Chain();
+        var caCert = X509CertificateLoader.LoadCertificateFromFile(_caPath);
+
+        chain.ChainPolicy.TrustMode = X509ChainTrustMode.CustomRootTrust;
+        chain.ChainPolicy.CustomTrustStore.Add(caCert);
+
+        chain.ChainPolicy.RevocationMode = X509RevocationMode.NoCheck;
+
+        chain.ChainPolicy.VerificationFlags = X509VerificationFlags.NoFlag;
+        chain.ChainPolicy.VerificationTime = DateTime.UtcNow;
+
+        var isValid = chain.Build(clientCert);
+
+        if (!isValid)
         {
-          chain.ChainPolicy.RevocationMode = X509RevocationMode.NoCheck;
-          chain.ChainPolicy.RevocationFlag = X509RevocationFlag.ExcludeRoot;
-          chain.ChainPolicy.VerificationFlags = X509VerificationFlags.NoFlag;
-          chain.ChainPolicy.VerificationFlags = X509VerificationFlags.AllowUnknownCertificateAuthority;
-
-          var caCert = X509Certificate2.CreateFromPemFile(_caPath, _caKeyPath);
-          chain.ChainPolicy.ExtraStore.Add(caCert);
-
-          bool isValid = chain.Build(clientCert);
-
-          if (!isValid)
+          foreach (var status in chain.ChainStatus)
           {
-            context.Response.StatusCode = StatusCodes.Status401Unauthorized;
-            return;
+            Console.WriteLine($"Chain error: {status.Status} - {status.StatusInformation}");
           }
+          context.Response.StatusCode = StatusCodes.Status401Unauthorized;
+           return;
         }
 
         await _next(context);
         break;
+      }
 
       default:
         context.Response.StatusCode = StatusCodes.Status401Unauthorized;
